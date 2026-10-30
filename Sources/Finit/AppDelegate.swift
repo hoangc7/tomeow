@@ -39,6 +39,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             chime("Purr")
             timer.start(.rest)
             island.presentCat(.breakTime, text: "Short break time! 🐾")
+        } else if Settings.autoStart {
+            chime("Glass")
+            timer.start(.work)
+            island.presentCat(.backToWork, text: "Break's over! Focus time 🍅")
         } else {
             chime("Glass")
             island.presentCat(.backToWork, text: "Break's over! Ready? \u{25B6}\u{FE0E}")
@@ -48,7 +52,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func primaryAction() {
         switch island.catKind {
-        case .backToWork?: startWork()  // the bubble asks "Ready?"
+        case .backToWork?:
+            // The "Ready?" bubble starts the next round; once it has auto-started, a click just sends the cat off.
+            if timer.phase == .idle { startWork() } else { island.dismissCat() }
         case .breakTime?: island.dismissCat()
         case nil where timer.phase == .idle: startWork()
         case nil: togglePause()
@@ -98,6 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             durations.addItem(entry)
         }
         menu.addItem(withTitle: "Durations", action: nil, keyEquivalent: "").submenu = durations
+        menu.addItem(item("Auto-start After Break", #selector(toggleAutoStart), on: Settings.autoStart))
         menu.addItem(item("Sound", #selector(toggleSound), on: Settings.soundOn))
         menu.addItem(item("Launch at Login", #selector(toggleLogin), on: SMAppService.mainApp.status == .enabled))
         menu.addItem(.separator())
@@ -116,6 +123,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Takes effect from the next round.
     @objc private func pickPreset(_ sender: NSMenuItem) {
         Settings.preset = Preset.all[sender.tag]
+    }
+
+    @objc private func toggleAutoStart() {
+        Settings.autoStart.toggle()
     }
 
     @objc private func toggleSound() {

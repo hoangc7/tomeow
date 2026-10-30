@@ -21,6 +21,12 @@ enum Settings {
         set { defaults.set(newValue, forKey: "soundOn") }
     }
 
+    /// Start the next focus round as soon as a break ends.
+    static var autoStart: Bool {
+        get { defaults.bool(forKey: "autoStart") }
+        set { defaults.set(newValue, forKey: "autoStart") }
+    }
+
     /// `--demo` turns every minute into a second, for watching a full cycle quickly.
     static let secondsPerMinute: TimeInterval = CommandLine.arguments.contains("--demo") ? 1 : 60
 }
