@@ -87,12 +87,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
         switch (timer.phase, timer.isPaused) {
-        case (.idle, _): menu.addItem(item("Start Focus", #selector(startWork)))
+        case (.idle, _): menu.addItem(item("Start focus", #selector(startWork)))
         case (_, false): menu.addItem(item("Pause", #selector(togglePause)))
         case (_, true): menu.addItem(item("Resume", #selector(togglePause)))
         }
         if timer.phase != .idle {
-            menu.addItem(item(timer.phase == .rest ? "Skip Break" : "Reset", #selector(reset)))
+            menu.addItem(item(timer.phase == .rest ? "Skip break" : "Reset", #selector(reset)))
         }
         menu.addItem(.separator())
 
@@ -104,9 +104,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             durations.addItem(entry)
         }
         menu.addItem(withTitle: "Durations", action: nil, keyEquivalent: "").submenu = durations
-        menu.addItem(item("Auto-start After Break", #selector(toggleAutoStart), on: Settings.autoStart))
+        menu.addItem(item("Auto-start after break", #selector(toggleAutoStart), on: Settings.autoStart))
         menu.addItem(item("Sound", #selector(toggleSound), on: Settings.soundOn))
-        menu.addItem(item("Launch at Login", #selector(toggleLogin), on: SMAppService.mainApp.status == .enabled))
+        menu.addItem(item("Launch at login", #selector(toggleLogin), on: SMAppService.mainApp.status == .enabled))
         menu.addItem(.separator())
         let quit = menu.addItem(withTitle: "Quit Tomeow", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         quit.target = NSApp

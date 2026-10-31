@@ -287,7 +287,7 @@ final class Countdown {
     func setStyle(color: CGColor, scale: CGFloat) {
         guard style.map({ $0.0 != color || $0.1 != scale }) ?? true else { return }
         style = (color, scale)
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor(cgColor: color)!]
         for glyph in "0123456789:" {
             let string = String(glyph) as NSString
