@@ -65,7 +65,7 @@ final class IslandView: NSView {
         for layer in [island, track, ring, icon, play, time.layer, stage] { self.layer!.addSublayer(layer) }
         applyScale()
         setAccessibilityRole(.button)
-        setAccessibilityLabel("Finit Pomodoro timer")
+        setAccessibilityLabel("Tomeow Pomodoro timer")
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }

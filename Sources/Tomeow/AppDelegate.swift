@@ -108,7 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(item("Sound", #selector(toggleSound), on: Settings.soundOn))
         menu.addItem(item("Launch at Login", #selector(toggleLogin), on: SMAppService.mainApp.status == .enabled))
         menu.addItem(.separator())
-        let quit = menu.addItem(withTitle: "Quit Finit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
+        let quit = menu.addItem(withTitle: "Quit Tomeow", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         quit.target = NSApp
         return menu
     }

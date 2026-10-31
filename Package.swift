@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "Finit",
+    name: "Tomeow",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "Finit",
-            path: "Sources/Finit",
+            name: "Tomeow",
+            path: "Sources/Tomeow",
             swiftSettings: [.unsafeFlags(["-Osize"])],
             linkerSettings: [
                 .linkedFramework("AppKit"),
