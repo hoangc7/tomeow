@@ -27,14 +27,23 @@ The countdown dims while paused. During a break the icon turns into a cat face a
 ## Requirements
 
 - macOS 14 or later. It's designed for MacBooks with a notch but works on any screen.
+- The download from Releases runs on Apple Silicon Macs. On an Intel Mac, build from source.
 - To build: Swift 6 (the Xcode Command Line Tools are enough; full Xcode isn't needed).
 
-## Build and install
+## Install
+
+1. Download the latest `Tomeow-<version>.zip` from [Releases](https://github.com/hoangc7/tomeow/releases/latest) and unzip it.
+2. Move **Tomeow.app** into your **/Applications** folder.
+3. Open it from `/Applications`. The first time, macOS says it can't verify the app, because it isn't notarized yet. Click **Done**, then open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to Tomeow. You only need to do this once.
+
+To start Tomeow when you log in, right-click the island and turn on **Launch at login**. Do this from the copy in `/Applications`. If you move the app later, turn the setting off and on again so it points to the new location.
+
+## Build from source
 
 ```sh
 ./build.sh            # builds build.noindex/Tomeow.app
-./build.sh install    # also copies it to /Applications
-open build.noindex/Tomeow.app
+./build.sh install    # also installs it to /Applications, replacing any copy there
+open /Applications/Tomeow.app
 ```
 
 To watch a whole cycle quickly, run it in demo mode, where every minute lasts one second:
