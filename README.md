@@ -32,15 +32,15 @@ The countdown dims while paused. During a break the icon turns into a cat face a
 ## Build and install
 
 ```sh
-./build.sh            # builds build/Tomeow.app
-./build.sh install    # also copies it to ~/Applications
-open build/Tomeow.app
+./build.sh            # builds build.noindex/Tomeow.app
+./build.sh install    # also copies it to /Applications
+open build.noindex/Tomeow.app
 ```
 
 To watch a whole cycle quickly, run it in demo mode, where every minute lasts one second:
 
 ```sh
-open build/Tomeow.app --args --demo
+open build.noindex/Tomeow.app --args --demo
 ```
 
 ## Resource use

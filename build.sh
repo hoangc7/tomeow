@@ -1,12 +1,13 @@
 #!/bin/sh
-# Builds build/Tomeow.app. `./build.sh install` also copies it to ~/Applications.
+# Builds build.noindex/Tomeow.app. `./build.sh install` also copies it to /Applications.
+# The .noindex suffix keeps Spotlight from listing the build next to the installed app.
 # The icon is pre-rendered; regenerate it with `swift Scripts/make-icon.swift`.
 set -eu
 cd "$(dirname "$0")"
 
 swift build -c release
 BIN="$(swift build -c release --show-bin-path)/Tomeow"
-APP=build/Tomeow.app
+APP=build.noindex/Tomeow.app
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -18,8 +19,7 @@ codesign --force --sign - "$APP"
 echo "Built $APP ($(du -k "$APP/Contents/MacOS/Tomeow" | cut -f1) KB binary)"
 
 if [ "${1:-}" = install ]; then
-  mkdir -p "$HOME/Applications"
-  rm -rf "$HOME/Applications/Tomeow.app"
-  cp -R "$APP" "$HOME/Applications/"
-  echo "Installed to ~/Applications/Tomeow.app"
+  rm -rf /Applications/Tomeow.app
+  cp -R "$APP" /Applications/
+  echo "Installed to /Applications/Tomeow.app"
 fi
