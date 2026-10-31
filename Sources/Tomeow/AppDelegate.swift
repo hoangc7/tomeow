@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         island.onMenu = { [unowned self] in makeMenu() }
         panel = IslandPanel(content: island)
         island.place()
+        island.appear()
         panel.orderFrontRegardless()
 
         timer.onTick = { [unowned self] in refresh() }
@@ -26,6 +27,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         workspace.addObserver(self, selector: #selector(displaysSlept), name: NSWorkspace.screensDidSleepNotification, object: nil)
         workspace.addObserver(self, selector: #selector(displaysWoke), name: NSWorkspace.screensDidWakeNotification, object: nil)
         workspace.addObserver(self, selector: #selector(systemWoke), name: NSWorkspace.didWakeNotification, object: nil)
+    }
+
+    /// Quitting waits a quarter second while the island tucks back into the notch.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let island else { return .terminateNow }
+        // A run-loop timer still fires if terminate was called from a main-queue block, which a
+        // dispatched reply would wait behind forever.
+        let reply = Timer(timeInterval: island.disappear(), repeats: false) { _ in
+            MainActor.assumeIsolated { NSApp.reply(toApplicationShouldTerminate: true) }
+        }
+        RunLoop.main.add(reply, forMode: .common)
+        return .terminateLater
     }
 
     // MARK: Flow

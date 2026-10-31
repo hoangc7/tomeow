@@ -13,6 +13,7 @@ final class IslandView: NSView {
     private var morphID = 0
 
     private let island = CAShapeLayer()
+    private let content = CALayer()  // everything drawn on the island, so it can fade as one
     private let icon = CALayer()
     private let track = CAShapeLayer()
     private let ring = CAShapeLayer()
@@ -29,6 +30,7 @@ final class IslandView: NSView {
     private static let tomatoRed = CGColor(srgbRed: 0.94, green: 0.33, blue: 0.27, alpha: 1)
     private static let mint = CGColor(srgbRed: 0.47, green: 0.86, blue: 0.55, alpha: 1)
     private static let white = CGColor(gray: 1, alpha: 1)
+    private static let shrinkDuration: TimeInterval = 0.25
 
     init(geometry: NotchGeometry) {
         self.geometry = geometry
@@ -62,7 +64,8 @@ final class IslandView: NSView {
         play.lineJoin = .round
 
         stage.mask = stageMask
-        for layer in [island, track, ring, icon, play, time.layer, stage] { self.layer!.addSublayer(layer) }
+        for layer in [track, ring, icon, play, time.layer] { content.addSublayer(layer) }
+        for layer in [island, content, stage] { self.layer!.addSublayer(layer) }
         applyScale()
         setAccessibilityRole(.button)
         setAccessibilityLabel("Tomeow Pomodoro timer")
@@ -139,6 +142,38 @@ final class IslandView: NSView {
         pendingCat = nil
     }
 
+    // MARK: Open and close
+
+    /// Grows the island out of the notch. Call before the window is first shown.
+    func appear() {
+        instant {
+            shapeSize = .hidden
+            island.path = outline(.hidden)
+        }
+        fadeContent(from: 0, to: 1, delay: 0.12)
+        morph(to: .compact) {}
+    }
+
+    /// Tucks the island back into the notch. Returns how long that takes.
+    func disappear() -> TimeInterval {
+        catID &+= 1
+        removeCat()
+        fadeContent(from: 1, to: 0)
+        morph(to: .hidden) {}
+        return Self.shrinkDuration
+    }
+
+    private func fadeContent(from start: Float, to end: Float, delay: TimeInterval = 0) {
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = start
+        fade.toValue = end
+        fade.duration = 0.15
+        fade.beginTime = content.convertTime(CACurrentMediaTime(), from: nil) + delay
+        fade.fillMode = .backwards
+        instant { content.opacity = end }
+        content.add(fade, forKey: "fade")
+    }
+
     // MARK: Geometry
 
     func place() {
@@ -167,7 +202,7 @@ final class IslandView: NSView {
     }
 
     private func relayout() {
-        for layer in [island, stage, stageMask] { layer.frame = bounds }
+        for layer in [island, content, stage, stageMask] { layer.frame = bounds }
         island.path = outline(shapeSize)
         stageMask.path = outline(.expanded)
         let y = bounds.maxY - geometry.notchHeight / 2
@@ -180,7 +215,8 @@ final class IslandView: NSView {
     /// The island's outline at `size`, hanging from the top centre of the current bounds.
     private func outline(_ size: IslandSize) -> CGPath {
         let box = geometry.islandSize(size)
-        let ear = NotchGeometry.ear, radius: CGFloat = size == .compact ? 9 : 18
+        let ear = size == .hidden ? 0 : NotchGeometry.ear
+        let radius = min(size == .expanded ? 18 : 9, box.height / 2)
         let left = bounds.midX - box.width / 2, right = bounds.midX + box.width / 2
         let top = bounds.maxY, bottom = top - box.height
         let path = CGMutablePath()
@@ -201,16 +237,18 @@ final class IslandView: NSView {
     private func morph(to size: IslandSize, then done: @escaping @MainActor () -> Void) {
         morphID &+= 1
         let id = morphID
-        var from = island.presentation()?.path ?? island.path
+        // Mid-morph, start from what's on screen; otherwise from the model, which may be newer.
+        var from = island.animation(forKey: "morph") == nil ? island.path : island.presentation()?.path ?? island.path
         if size == .expanded && windowSize == .compact {
             windowSize = .expanded
             place()  // the outline stays compact inside the bigger window until the spring opens it
             from = island.path
         }
+        let growing = size == .expanded || shapeSize == .hidden
         shapeSize = size
         let to = outline(size)
         let animation: CABasicAnimation
-        if size == .expanded {
+        if growing {
             let spring = CASpringAnimation(keyPath: "path")
             spring.damping = 20
             spring.stiffness = 300
@@ -218,7 +256,7 @@ final class IslandView: NSView {
             animation = spring
         } else {
             animation = CABasicAnimation(keyPath: "path")
-            animation.duration = 0.25
+            animation.duration = Self.shrinkDuration
             animation.timingFunction = CAMediaTimingFunction(name: .easeIn)
         }
         animation.fromValue = from
@@ -226,9 +264,9 @@ final class IslandView: NSView {
         instant { island.path = to }
         island.add(animation, forKey: "morph")
 
-        after(size == .expanded ? 0.3 : animation.duration) { [weak self] in
+        after(growing ? 0.3 : animation.duration) { [weak self] in
             guard let self, morphID == id else { return }
-            if size == .compact {
+            if size == .compact && windowSize == .expanded {
                 island.removeAnimation(forKey: "morph")
                 windowSize = .compact
                 place()

@@ -1,6 +1,7 @@
 import AppKit
 
-enum IslandSize { case compact, expanded }
+/// `hidden` is tucked into the notch (or the top edge), for growing out on launch and back in on quit.
+enum IslandSize { case hidden, compact, expanded }
 
 /// Where the island lives: around the notch, or around a small fake one on screens without a notch.
 struct NotchGeometry: Equatable {
@@ -12,6 +13,7 @@ struct NotchGeometry: Equatable {
     var screen: CGRect
     var notchWidth: CGFloat
     var notchHeight: CGFloat
+    var hasNotch: Bool
     var scale: CGFloat
 
     @MainActor static func current() -> NotchGeometry? {
@@ -22,15 +24,16 @@ struct NotchGeometry: Equatable {
         let frame = screen.frame
         if screen.safeAreaInsets.top > 0, let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea {
             return NotchGeometry(screen: frame, notchWidth: frame.width - left.width - right.width,
-                                 notchHeight: screen.safeAreaInsets.top, scale: screen.backingScaleFactor)
+                                 notchHeight: screen.safeAreaInsets.top, hasNotch: true, scale: screen.backingScaleFactor)
         }
         let menuBar = frame.maxY - screen.visibleFrame.maxY
         return NotchGeometry(screen: frame, notchWidth: 64, notchHeight: menuBar > 0 ? menuBar : NSStatusBar.system.thickness,
-                             scale: screen.backingScaleFactor)
+                             hasNotch: false, scale: screen.backingScaleFactor)
     }
 
     func islandSize(_ size: IslandSize) -> CGSize {
         switch size {
+        case .hidden: CGSize(width: notchWidth, height: hasNotch ? notchHeight : 0)
         case .compact: CGSize(width: notchWidth + 2 * Self.wing, height: notchHeight)
         case .expanded: CGSize(width: notchWidth + 2 * Self.wideWing, height: notchHeight + Self.drop)
         }
