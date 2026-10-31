@@ -2,6 +2,10 @@
 
 A tiny Pomodoro timer that lives in the MacBook notch. Click the island to start a focus round. When it ends, a pixel-art cat runs out of the notch to tell you to take a short break.
 
+<p align="center">
+  <img src="docs/island.png" width="560" alt="The Tomeow island around the notch: idle with a play button, counting down a focus round, and the cat announcing a break">
+</p>
+
 ## Features
 
 - Sits around the notch as a small black "island", with a tomato on one side and the countdown on the other. Screens without a notch get a small pill at the top centre instead.
