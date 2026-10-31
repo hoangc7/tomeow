@@ -89,3 +89,7 @@ Keep the background outline as it is: Apple's 824 px rounded square with 185.4 p
 
 - The island covers menu bar items within about 60 pt of the notch. While the cat is out (about 7 seconds), it covers a larger area at the top of the screen.
 - The app is signed ad hoc, so it is meant for your own Mac rather than distribution.
+
+## License
+
+[MIT](LICENSE)
