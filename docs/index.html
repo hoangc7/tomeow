@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tomeow · A Pomodoro timer in your MacBook notch</title>
+<meta name="description" content="A tiny Pomodoro timer that lives in the MacBook notch. When a focus round ends, a pixel-art cat runs out of the notch to tell you to take a break.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Tomeow">
+<meta property="og:description" content="A tiny Pomodoro timer that lives in your MacBook notch.">
+<meta property="og:url" content="https://hoangc7.github.io/tomeow/">
+<meta property="og:image" content="https://hoangc7.github.io/tomeow/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  :root {
+    --bg: #f6f4f1;
+    --fg: #1c1b1e;
+    --muted: #6d6b72;
+    --rim: #c5c4ca;
+    --btn: #141416;
+    --btn-fg: #fff;
+    --accent: #e0473a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e0e10;
+      --fg: #f1f0f2;
+      --muted: #9c9aa2;
+      --rim: #3b3a40;
+      --btn: #f1f0f2;
+      --btn-fg: #121214;
+      --accent: #ff6b5d;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px 0;
+  }
+
+  /* The top of a MacBook lid: bezel, screen, menu bar. The island is drawn on a canvas over it. */
+  .lid {
+    --s: 1;
+    --bezel: clamp(8px, 1.4vw, 14px);
+    width: min(1040px, 100%);
+    padding: var(--bezel) var(--bezel) 0;
+    border-radius: calc(var(--bezel) + 12px) calc(var(--bezel) + 12px) 0 0;
+    background: #0c0c0e;
+    box-shadow: 0 0 0 1.5px var(--rim);
+    -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent);
+    mask-image: linear-gradient(to bottom, #000 62%, transparent);
+  }
+  .screen {
+    position: relative;
+    height: calc(146px * var(--s));
+    border-radius: calc(10px * var(--s)) calc(10px * var(--s)) 0 0;
+    overflow: hidden;
+    background:
+      radial-gradient(120% 140% at 85% 0%, rgba(255, 214, 190, .35), transparent 55%),
+      linear-gradient(100deg, #4f5f99 0%, #7e7c9f 45%, #c4907f 100%);
+  }
+  .menubar {
+    position: absolute;
+    inset: 0 0 auto;
+    height: calc(32px * var(--s));
+    background: rgba(255, 255, 255, .2);
+    color: #fff;
+    font-size: calc(13px * var(--s));
+    line-height: calc(32px * var(--s));
+    text-shadow: 0 0 2px rgba(0, 0, 0, .12);
+    white-space: nowrap;
+  }
+  /* Items that don't fit beside the island wrap onto a hidden second line. */
+  .menus {
+    position: absolute;
+    top: 0;
+    width: calc(50% - 162px * var(--s));
+    height: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    overflow: hidden;
+    padding: 0 calc(10px * var(--s));
+  }
+  .menus > * { padding: 0 calc(9px * var(--s)); height: 100%; display: flex; align-items: center; }
+  .menus.left { left: 0; }
+  .menus.left b { font-weight: 700; }
+  .menus.right { right: 0; flex-direction: row-reverse; } /* the clock is first in the DOM so it wraps last */
+  #date { padding-right: 0; }
+  .menus svg { width: calc(17px * var(--s)); height: calc(17px * var(--s)); }
+
+  .demo {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    line-height: 0;
+  }
+  #island { display: block; outline: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  #island:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+  .ghost {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: calc(18px * var(--s));
+    height: calc(26px * var(--s));
+    pointer-events: none;
+    opacity: 0;
+    transform-origin: 0 0;
+    filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, .35));
+  }
+
+  .hint {
+    margin: 6px 0 0;
+    font-size: .8125rem;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .intro {
+    max-width: 34rem;
+    margin-top: clamp(20px, 4vh, 40px);
+    text-align: center;
+  }
+  h1 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .25em;
+    margin: 0;
+    font-size: clamp(2.25rem, 6vw, 3rem);
+    line-height: 1.1;
+    letter-spacing: -.03em;
+  }
+  h1 img { width: 1.5em; height: 1.5em; margin: -.25em 0 -.25em -.25em; }
+  .tagline {
+    margin: .5rem 0 1.5rem;
+    font-size: 1.125rem;
+    color: var(--muted);
+    text-wrap: balance;
+  }
+
+  .download {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 28px 14px 24px;
+    border-radius: 999px;
+    background: var(--btn);
+    color: var(--btn-fg);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    text-decoration: none;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .18), 0 10px 28px -10px rgba(0, 0, 0, .45);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .download:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0, 0, 0, .18), 0 14px 32px -10px rgba(0, 0, 0, .5); }
+  .download:active { transform: translateY(0); }
+  .download:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  .download svg { width: 20px; height: 20px; }
+
+  .meta {
+    margin: .875rem 0 0;
+    font-size: .8125rem;
+    color: var(--muted);
+  }
+
+  details {
+    margin: .5rem auto 0;
+    max-width: 28rem;
+    font-size: .875rem;
+    color: var(--muted);
+  }
+  summary {
+    display: inline-block;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+    text-underline-offset: 3px;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  details ol { margin: .75rem 0 0; padding-left: 1.25rem; text-align: left; }
+  details li + li { margin-top: .375rem; }
+  details strong { color: var(--fg); font-weight: 600; }
+
+  footer {
+    padding: 28px 16px 24px;
+    font-size: .8125rem;
+    color: var(--muted);
+    text-align: center;
+  }
+  footer a { text-underline-offset: 3px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .download { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="lid">
+    <div class="screen">
+      <div class="menubar" aria-hidden="true">
+        <div class="menus left"><b>Writer</b><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+        <div class="menus right">
+          <span id="time"></span>
+          <span id="date"></span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2.5 9a14 14 0 0 1 19 0M6 12.5a9 9 0 0 1 12 0M9.5 16a4 4 0 0 1 5 0"/><circle cx="12" cy="19.5" r=".8" fill="currentColor"/></svg></span>
+          <span><svg viewBox="0 0 28 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="7" width="21" height="10" rx="3"/><rect x="4" y="9" width="13" height="6" rx="1.5" fill="currentColor" stroke="none"/><path d="M25 10.5v3" stroke-linecap="round"/></svg></span>
+        </div>
+      </div>
+      <div class="demo">
+        <canvas id="island" role="button" tabindex="0" aria-label="Tomeow demo: click to start, pause, or send the cat away"></canvas>
+        <svg class="ghost" viewBox="0 0 18 26" aria-hidden="true"><path d="M2 2v18l4.6-4.3 3.1 7.3 3-1.3-3-7.1h6.2z" fill="#000" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+  </div>
+  <p class="hint">Sped-up demo. Click the island to try it.</p>
+
+  <section class="intro">
+    <h1><img src="icon.png" alt="" width="72" height="72">Tomeow</h1>
+    <p class="tagline">A tiny Pomodoro timer that lives in your MacBook notch. When a focus round ends, a pixel cat runs out to call a break.</p>
+    <a class="download" id="download" href="https://github.com/hoangc7/tomeow/releases/latest">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></svg>
+      Download for macOS
+    </a>
+    <p class="meta">Version <span id="version">0.1.0</span> · Apple Silicon · macOS 14 or later · Free</p>
+    <details>
+      <summary>macOS says it can't verify the app?</summary>
+      <ol>
+        <li>Unzip the download and move <strong>Tomeow.app</strong> into your <strong>Applications</strong> folder.</li>
+        <li>Open it. Tomeow isn't notarized yet, so macOS warns that it can't verify it. Click <strong>Done</strong>.</li>
+        <li>Open <strong>System Settings → Privacy &amp; Security</strong>, scroll down and click <strong>Open Anyway</strong> next to Tomeow. You only need to do this once.</li>
+      </ol>
+    </details>
+  </section>
+</main>
+<footer>
+  <a href="https://github.com/hoangc7/tomeow">Source on GitHub</a> · <a href="https://github.com/hoangc7/tomeow/blob/main/LICENSE">MIT License</a>
+</footer>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---- Latest release: point the button straight at the zip -----------------------------
+  fetch('https://api.github.com/repos/hoangc7/tomeow/releases/latest')
+    .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+    .then((release) => {
+      const zip = (release.assets || []).find((a) => a.name.endsWith('.zip'));
+      if (zip) document.getElementById('download').href = zip.browser_download_url;
+      if (release.tag_name) document.getElementById('version').textContent = release.tag_name.replace(/^v/, '');
+    })
+    .catch(() => {}); // the button already links to the latest release page
+
+  // ---- Menu bar clock ------------------------------------------------------------------------
+  const updateClock = () => {
+    const d = new Date();
+    document.getElementById('date').textContent = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+    document.getElementById('time').textContent = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  };
+  updateClock();
+  setInterval(updateClock, 15000);
+
+  // ---- Geometry (points), ported from IslandWindow.swift ------------------------------------
+  const NW = 180, NH = 32, EAR = 6, WING = 56, WIDE = 150, DROP = 44;
+  const W = NW + 2 * WIDE + 2 * EAR, H = NH + DROP, MX = W / 2;
+  const SIZES = {
+    hidden: { w: NW, h: NH, ear: 0, r: 9 },
+    compact: { w: NW + 2 * WING, h: NH, ear: EAR, r: 9 },
+    expanded: { w: NW + 2 * WIDE, h: H, ear: EAR, r: 18 },
+  };
+  const OFFSET = NW / 2 + WING / 2; // icon and countdown sit in the middle of each wing
+  const RED = 'rgb(240,84,69)', MINT = 'rgb(120,219,140)';
+
+  // ---- Sprites, ported from PixelArt.swift --------------------------------------------------
+  const PALETTE = {
+    o: '#f5a345', d: '#d17326', w: '#fff5e8', p: '#ff8fa3', k: '#291a12',
+    r: '#f04d3d', h: '#ff9e8a', s: '#bd2e26', g: '#66c25e',
+  };
+  const sprite = (rows) => {
+    const c = document.createElement('canvas');
+    c.width = rows[0].length;
+    c.height = rows.length;
+    const g = c.getContext('2d');
+    rows.forEach((row, y) => [...row].forEach((key, x) => {
+      if (PALETTE[key]) { g.fillStyle = PALETTE[key]; g.fillRect(x, y, 1, 1); }
+    }));
+    return c;
+  };
+  const CAT_BODY = [
+    '................',
+    '.........o.....o',
+    '.........op...po',
+    '..d......ooooooo',
+    '.d.......okoooko',
+    '.d.dododooowpwoo',
+    '..oooooooooooooo',
+    '..ooooooooowwoo.',
+    '...oooooooowwo..',
+  ];
+  const LEGS = [
+    ['.oo.........oo..', 'ww............ww'],
+    ['...o.o....o.o...', '...w.w....w.w...'],
+    ['.....oo..oo.....', '.....ww..ww.....'],
+  ];
+  const BLANK = '.'.repeat(16);
+  const RUN = [[0, false], [1, true], [2, false], [1, true]].map(([legs, lifted]) => {
+    const rows = [...CAT_BODY, ...LEGS[legs], BLANK];
+    return sprite(lifted ? [...rows.slice(1), BLANK] : rows);
+  });
+  const SIT = sprite([
+    '................',
+    '.........o.....o',
+    '.........op...po',
+    '.........ooooooo',
+    '.........okoooko',
+    '.........oowpwoo',
+    '........oooooooo',
+    '.......ooooowwo.',
+    '......dodoowwwo.',
+    '.d....oooooowwo.',
+    '.d....oooooowwo.',
+    '..ddddowwoowwo..',
+  ]);
+  const TOMATO = sprite(['...g...', '.rgggr.', 'rhrgrrr', 'rhrrrrr', 'rrrrrrr', 'rrrrrrs', '.rrrss.']);
+  const FACE = sprite(['o.....o', 'op...po', 'ooooooo', 'okoooko', 'oowpwoo', 'ooooooo', '.ooooo.']);
+  const CAT_W = 32, CAT_H = 24;
+
+  // ---- Timing curves: Core Animation springs and media timing functions --------------------
+  const spring = (stiffness, damping) => {
+    const a = damping / 2, wd = Math.sqrt(stiffness - a * a);
+    return (t) => (t <= 0 ? 0 : 1 - Math.exp(-a * t) * (Math.cos(wd * t) + (a / wd) * Math.sin(wd * t)));
+  };
+  const islandSpring = spring(300, 20);
+  const popSpring = spring(320, 12);
+  const bezier = (x1, y1, x2, y2) => {
+    const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+    const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+    return (x) => {
+      if (x <= 0) return 0;
+      if (x >= 1) return 1;
+      let lo = 0, hi = 1, t = x;
+      for (let i = 0; i < 24; i++) {
+        t = (lo + hi) / 2;
+        if (((ax * t + bx) * t + cx) * t < x) lo = t; else hi = t;
+      }
+      return ((ay * t + by) * t + cy) * t;
+    };
+  };
+  const easeIn = bezier(0.42, 0, 1, 1), easeOut = bezier(0, 0, 0.58, 1), glide = bezier(0.2, 0.7, 0.3, 1);
+  const lerp = (a, b, f) => a + (b - a) * f;
+  const keyframes = (values, times, timings, u) => {
+    if (u <= 0) return values[0];
+    if (u >= 1) return values[values.length - 1];
+    let i = 0;
+    while (i < times.length - 2 && u > times[i + 1]) i++;
+    const local = (u - times[i]) / (times[i + 1] - times[i]);
+    const f = timings && timings[i] ? timings[i](local) : local;
+    const a = values[i], b = values[i + 1];
+    return typeof a === 'number' ? lerp(a, b, f) : { x: lerp(a.x, b.x, f), y: lerp(a.y, b.y, f) };
+  };
+
+  // ---- Canvas -------------------------------------------------------------------------------
+  const lid = document.querySelector('.lid');
+  const screen = document.querySelector('.screen');
+  const canvas = document.getElementById('island');
+  const ghostEl = document.querySelector('.ghost');
+  const ctx = canvas.getContext('2d');
+  const TIME_FONT = '400 13px -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif';
+  const BUBBLE_FONT = '600 12px ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
+  let scale = 1, k = 1;
+
+  const resize = () => {
+    scale = Math.min(1.5, (screen.clientWidth - 16) / W);
+    lid.style.setProperty('--s', scale);
+    const dpr = window.devicePixelRatio || 1;
+    k = scale * dpr;
+    canvas.width = Math.round(W * k);
+    canvas.height = Math.round(H * k);
+    canvas.style.width = W * scale + 'px';
+    canvas.style.height = H * scale + 'px';
+  };
+  resize();
+  window.addEventListener('resize', resize);
+
+  // ---- Scheduler on a simulated clock (so a hidden tab doesn't jump ahead) -------------------
+  let now = 0;
+  const tasks = [];
+  const after = (seconds, fn) => tasks.push({ at: now + seconds, fn });
+  const runTasks = () => {
+    for (;;) {
+      let next = -1;
+      tasks.forEach((task, i) => { if (task.at <= now && (next < 0 || task.at < tasks[next].at)) next = i; });
+      if (next < 0) return;
+      tasks.splice(next, 1)[0].fn();
+    }
+  };
+
+  // ---- Timer, as in PomodoroTimer.swift but fast-forwarded ----------------------------------
+  const RATE = { work: 1500 / 5, rest: 300 / 8.5 }; // a 25-min round in 5 s, a 5-min break in 8.5 s
+  const timer = { phase: 'idle', total: 0, remaining: 0, paused: false };
+  const timerStart = (phase) => {
+    Object.assign(timer, { phase, total: phase === 'work' ? 1500 : 300, paused: false });
+    timer.remaining = timer.total;
+  };
+  const tick = (dt) => {
+    if (timer.phase === 'idle' || timer.paused) return;
+    timer.remaining -= dt * RATE[timer.phase];
+    if (timer.remaining <= 0) finished(timer.phase);
+  };
+  const finished = (phase) => {
+    if (phase === 'work') {
+      timerStart('rest');
+      presentCat('break', 'Short break time! \u{1F43E}', 3.5);
+    } else {
+      timer.phase = 'idle';
+      presentCat('back', "Break's over! Ready? ▶︎", 4.5);
+    }
+  };
+
+  // ---- Island outline and morphing, ported from IslandView.swift ----------------------------
+  let shapeSize = 'hidden', windowSize = 'compact', morphAnim = null, morphID = 0;
+  let contentFade = { from: 0, to: 0, start: 0, delay: 0 };
+
+  const shapeAt = (t) => {
+    if (morphAnim) {
+      const e = t - morphAnim.start;
+      const done = morphAnim.spring ? e > 1.5 : e >= 0.25;
+      if (!done) {
+        const p = morphAnim.spring ? islandSpring(e) : easeIn(e / 0.25);
+        const a = morphAnim.from, b = morphAnim.to;
+        return { w: lerp(a.w, b.w, p), h: lerp(a.h, b.h, p), ear: lerp(a.ear, b.ear, p), r: lerp(a.r, b.r, p) };
+      }
+      morphAnim = null;
+    }
+    return SIZES[shapeSize];
+  };
+
+  const outline = (s) => {
+    const left = MX - s.w / 2, right = MX + s.w / 2, bottom = s.h, r = Math.min(s.r, s.h / 2), ear = s.ear;
+    ctx.beginPath();
+    ctx.moveTo(left - ear, 0);
+    ctx.quadraticCurveTo(left, 0, left, ear);
+    ctx.lineTo(left, bottom - r);
+    ctx.quadraticCurveTo(left, bottom, left + r, bottom);
+    ctx.lineTo(right - r, bottom);
+    ctx.quadraticCurveTo(right, bottom, right, bottom - r);
+    ctx.lineTo(right, ear);
+    ctx.quadraticCurveTo(right, 0, right + ear, 0);
+    ctx.closePath();
+  };
+
+  const morph = (size, done) => {
+    const id = ++morphID;
+    let from = shapeAt(now);
+    if (size === 'expanded' && windowSize === 'compact') {
+      windowSize = 'expanded';
+      from = SIZES[shapeSize];
+    }
+    const growing = size === 'expanded' || shapeSize === 'hidden';
+    shapeSize = size;
+    morphAnim = { from, to: SIZES[size], start: now, spring: growing };
+    after(growing ? 0.3 : 0.25, () => {
+      if (morphID !== id) return;
+      if (size === 'compact' && windowSize === 'expanded') {
+        morphAnim = null;
+        windowSize = 'compact';
+      }
+      done();
+    });
+  };
+
+  const appear = () => {
+    contentFade = { from: 0, to: 1, start: now, delay: 0.12 };
+    morph('compact', () => {});
+  };
+  const contentOpacity = (t) => {
+    const e = t - contentFade.start - contentFade.delay;
+    return e <= 0 ? contentFade.from : e >= 0.15 ? contentFade.to : lerp(contentFade.from, contentFade.to, e / 0.15);
+  };
+
+  // ---- The cat, ported from CatShow.swift ---------------------------------------------------
+  const bubbleWidth = (text) => {
+    ctx.font = BUBBLE_FONT;
+    return Math.ceil(ctx.measureText(text).width) + 2 * 9 + 5;
+  };
+  const runFrame = (e) => RUN[Math.floor(e / 0.1) % 4];
+
+  class Cat {
+    constructor(kind, text) {
+      this.kind = kind;
+      this.text = text;
+      this.leaving = false;
+      this.bubbleW = bubbleWidth(text);
+      const y = H - DROP / 2;
+      this.notch = { x: MX, y: NH / 2 };
+      this.sit = { x: Math.round(MX - (CAT_W + 4 + this.bubbleW) / 2 + CAT_W / 2), y };
+      this.offstage = { x: MX - SIZES.expanded.w / 2 - CAT_W, y };
+    }
+    enter(t) {
+      this.t0 = t;
+      this.enterDur = this.kind === 'break' ? 1.2 : 1.1;
+      this.bubbleStart = t + this.enterDur + 0.05;
+      return this.enterDur + 0.4;
+    }
+    leave(t) {
+      this.from = this.pose(t).pos;
+      this.leaving = true;
+      this.t1 = t;
+      this.leaveDur = this.kind === 'break' ? 0.7 : 0.8;
+      return this.leaveDur;
+    }
+    pose(t) {
+      if (this.leaving) {
+        const e = t - this.t1, u = e / this.leaveDur, running = e < this.leaveDur;
+        if (this.kind === 'break') { // dash off to the left
+          return { pos: keyframes([this.from, this.offstage], [0, 1], null, u), sprite: running ? runFrame(e) : SIT, flip: true, alpha: 1 };
+        }
+        const below = { x: this.notch.x, y: this.sit.y }; // run to the notch and hop back inside
+        return {
+          pos: keyframes([this.from, below, this.notch], [0, 0.7, 1], [null, easeOut], u),
+          sprite: running ? runFrame(e) : SIT, flip: false, alpha: keyframes([1, 1, 0], [0, 0.7, 1], null, u),
+        };
+      }
+      const e = t - this.t0, u = e / this.enterDur;
+      if (e >= this.enterDur) return { pos: this.sit, sprite: SIT, flip: false, alpha: 1 };
+      if (this.kind === 'break') { // drop out of the notch, then scamper left
+        const below = { x: this.notch.x, y: this.sit.y };
+        return {
+          pos: keyframes([this.notch, below, this.sit], [0, 0.25, 1], [easeIn, null], u),
+          sprite: runFrame(e), flip: true, alpha: keyframes([0, 1, 1], [0, 0.12, 1], null, u),
+        };
+      }
+      return { pos: keyframes([this.offstage, this.sit], [0, 1], null, u), sprite: runFrame(e), flip: false, alpha: 1 };
+    }
+    bubble(t) {
+      if (this.leaving) return { alpha: Math.max(0, 1 - (t - this.t1) / 0.15), scale: 1 };
+      const e = t - this.bubbleStart;
+      if (e <= 0) return { alpha: 0, scale: 0.3 };
+      return { alpha: Math.min(1, e / 0.1), scale: lerp(0.3, 1, popSpring(e)) };
+    }
+  }
+
+  let cat = null, pendingCat = null, catID = 0;
+  const catKind = () => (cat ? (cat.leaving ? null : cat.kind) : pendingCat);
+  const removeCat = () => { cat = null; pendingCat = null; };
+
+  const presentCat = (kind, text, hold) => {
+    removeCat();
+    const id = ++catID;
+    pendingCat = kind;
+    morph('expanded', () => {
+      if (catID !== id) return;
+      pendingCat = null;
+      cat = new Cat(kind, text);
+      after(cat.enter(now) + hold, () => { if (catID === id) dismissCat(); });
+    });
+  };
+
+  const dismissCat = () => {
+    if (catKind() == null) return;
+    const id = ++catID;
+    pendingCat = null;
+    after(cat ? cat.leave(now) : 0, () => {
+      if (catID !== id) return;
+      removeCat();
+      morph('compact', () => {});
+    });
+  };
+
+  // ---- Clicks, as in AppDelegate.primaryAction --------------------------------------------
+  const startWork = () => { dismissCat(); timerStart('work'); };
+  const primaryAction = () => {
+    const kind = catKind();
+    if (kind === 'back') timer.phase === 'idle' ? startWork() : dismissCat();
+    else if (kind === 'break') dismissCat();
+    else if (timer.phase === 'idle') startWork();
+    else timer.paused = !timer.paused;
+  };
+
+  // ---- Drawing ------------------------------------------------------------------------------
+  const drawSprite = (img, x, y, w, h) => ctx.drawImage(img, x, y, w, h);
+
+  const drawPlay = (cx, cy) => {
+    ctx.beginPath();
+    ctx.moveTo(cx - 4, cy - 5);
+    ctx.lineTo(cx + 5, cy);
+    ctx.lineTo(cx - 4, cy + 5);
+    ctx.closePath();
+    ctx.fillStyle = ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.fill();
+    ctx.stroke();
+  };
+
+  let digitW = 0, colonW = 0, digitAscent = 0;
+  const drawTime = (text, cx, cy, color, alpha) => {
+    ctx.font = TIME_FONT;
+    if (!digitW) {
+      for (const d of '0123456789') digitW = Math.max(digitW, ctx.measureText(d).width);
+      colonW = ctx.measureText(':').width;
+      digitAscent = ctx.measureText('0').actualBoundingBoxAscent || 9.4;
+    }
+    const widths = [...text].map((ch) => (ch === ':' ? colonW : digitW));
+    let x = cx - widths.reduce((a, b) => a + b, 0) / 2;
+    ctx.globalAlpha *= alpha;
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    [...text].forEach((ch, i) => {
+      ctx.fillText(ch, x + widths[i] / 2, cy + digitAscent / 2);
+      x += widths[i];
+    });
+  };
+
+  const drawContent = () => {
+    const y = NH / 2, resting = timer.phase === 'rest';
+    if (timer.phase !== 'idle') {
+      const color = resting ? MINT : RED;
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(255,255,255,.16)';
+      ctx.beginPath();
+      ctx.arc(MX - OFFSET, y, 10, 0, Math.PI * 2);
+      ctx.stroke();
+      const progress = Math.min(1, Math.max(0.0005, 1 - timer.remaining / timer.total));
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      ctx.arc(MX - OFFSET, y, 10, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+      ctx.stroke();
+    }
+    drawSprite(resting ? FACE : TOMATO, MX - OFFSET - 7, y - 7, 14, 14);
+    if (timer.phase === 'idle') {
+      drawPlay(MX + OFFSET + 1, y);
+    } else {
+      const s = Math.max(0, Math.ceil(timer.remaining));
+      const text = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+      drawTime(text, MX + OFFSET, y, resting ? MINT : '#fff', timer.paused ? 0.45 : 1);
+    }
+  };
+
+  const roundRect = (x, y, w, h, r) => {
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  };
+
+  const drawCat = (t) => {
+    const pose = cat.pose(t);
+    if (pose.alpha > 0) {
+      ctx.save();
+      ctx.globalAlpha = pose.alpha;
+      ctx.translate(pose.pos.x, pose.pos.y);
+      if (pose.flip) ctx.scale(-1, 1);
+      drawSprite(pose.sprite, -CAT_W / 2, -CAT_H / 2, CAT_W, CAT_H);
+      ctx.restore();
+    }
+    const b = cat.bubble(t);
+    if (b.alpha <= 0) return;
+    const w = cat.bubbleW, h = 22, tail = 5;
+    ctx.save();
+    ctx.globalAlpha = b.alpha;
+    ctx.translate(cat.sit.x + CAT_W / 2 + 2, cat.sit.y - 3); // anchored at the tail, middle left
+    ctx.scale(b.scale, b.scale);
+    ctx.translate(0, -h / 2);
+    ctx.beginPath();
+    roundRect(tail, 0, w - tail, h, 9);
+    ctx.moveTo(tail + 2, 7);
+    ctx.lineTo(0, 12);
+    ctx.lineTo(tail + 2, 15);
+    ctx.closePath();
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.font = BUBBLE_FONT;
+    ctx.fillStyle = 'rgb(31,31,31)';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(cat.text, tail + 9, h / 2 + 0.5);
+    ctx.restore();
+  };
+
+  const draw = (t) => {
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    ctx.imageSmoothingEnabled = false;
+
+    ctx.save();
+    const win = SIZES[windowSize]; // the panel clips the island, like the real window does
+    ctx.beginPath();
+    ctx.rect(MX - win.w / 2 - EAR, 0, win.w + 2 * EAR, win.h);
+    ctx.clip();
+    outline(shapeAt(t));
+    ctx.fillStyle = '#000';
+    ctx.fill();
+
+    ctx.save();
+    ctx.globalAlpha = contentOpacity(t);
+    drawContent();
+    ctx.restore();
+
+    if (cat) {
+      ctx.save();
+      outline(SIZES.expanded); // the cat's stage is masked to the open island
+      ctx.clip();
+      drawCat(t);
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // The notch itself hides anything inside it, so the cat really comes out of it.
+    outline(SIZES.hidden);
+    ctx.fillStyle = '#000';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(MX, NH / 2 - 2, 2.6, 0, Math.PI * 2);
+    ctx.fillStyle = '#101018';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(MX - 0.7, NH / 2 - 2.7, 0.9, 0, Math.PI * 2);
+    ctx.fillStyle = '#25253a';
+    ctx.fill();
+  };
+
+  // ---- Autopilot: a ghost cursor clicks whenever the demo waits for a click ------------------
+  let waitKind = null, waitSince = 0, lastUser = -Infinity, ghost = null;
+
+  const waitTarget = () => {
+    const kind = catKind();
+    if (kind === 'back' && timer.phase === 'idle' && cat && now > cat.bubbleStart + 0.5) {
+      return { kind: 'ready', x: cat.sit.x + CAT_W / 2 + 2 + cat.bubbleW * 0.6, y: cat.sit.y - 2 };
+    }
+    if (kind == null && !cat && timer.phase === 'idle' && shapeSize === 'compact' && !morphAnim && windowSize === 'compact') {
+      return { kind: 'idle', x: MX + OFFSET + 1, y: NH / 2 + 1 };
+    }
+    if (kind == null && timer.paused) return { kind: 'paused', x: MX + OFFSET, y: NH / 2 + 1 };
+    return null;
+  };
+
+  const autopilot = () => {
+    const target = waitTarget();
+    const kind = target ? target.kind : null;
+    if (kind !== waitKind) { waitKind = kind; waitSince = now; }
+    if (!ghost && target && now - waitSince > 0.8 && now - lastUser > 6) ghost = { t0: now, target, clicked: false };
+    if (!ghost) return;
+    const e = now - ghost.t0;
+    if (!ghost.clicked && e >= 0.8) {
+      ghost.clicked = true;
+      const current = waitTarget();
+      if (current && current.kind === ghost.target.kind) primaryAction();
+    }
+    if (e > 1.8) ghost = null;
+  };
+
+  const placeGhost = () => {
+    if (!ghost) { ghostEl.style.opacity = 0; return; }
+    const e = now - ghost.t0, { x, y } = ghost.target;
+    let px, py, alpha, press = 1;
+    if (e < 0.6) {
+      const f = glide(e / 0.6);
+      px = lerp(x + 70, x, f); py = lerp(y + 64, y, f); alpha = Math.min(1, e / 0.25);
+    } else if (e < 1.1) {
+      px = x; py = y; alpha = 1;
+      if (e > 0.68 && e < 0.84) press = 0.84;
+    } else {
+      const f = easeIn(Math.min(1, (e - 1.1) / 0.7));
+      px = lerp(x, x + 84, f); py = lerp(y, y + 70, f); alpha = 1 - f;
+    }
+    ghostEl.style.opacity = alpha;
+    ghostEl.style.transform = `translate(${(px - 2) * scale}px, ${(py - 2) * scale}px) scale(${press})`;
+  };
+
+  // ---- Input ------------------------------------------------------------------------------
+  const toLocal = (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    return { x: ((ev.clientX - rect.left) / rect.width) * W, y: ((ev.clientY - rect.top) / rect.height) * H };
+  };
+  const onIsland = ({ x, y }) => {
+    const s = shapeAt(now);
+    return Math.abs(x - MX) <= s.w / 2 && y <= s.h;
+  };
+  const userAction = () => {
+    lastUser = now;
+    if (ghost) ghost.clicked = true;
+    primaryAction();
+  };
+
+  // ---- Run --------------------------------------------------------------------------------
+  const still = new URLSearchParams(location.search).has('still') ||
+    matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (still) {
+    // One representative frame: a break has just started and the cat is out.
+    timerStart('rest');
+    timer.remaining = 297;
+    shapeSize = windowSize = 'expanded';
+    contentFade = { from: 1, to: 1, start: 0, delay: 0 };
+    cat = new Cat('break', 'Short break time! \u{1F43E}');
+    cat.enter(-10);
+    draw(0);
+    window.addEventListener('resize', () => draw(0));
+    canvas.removeAttribute('role');
+    canvas.removeAttribute('tabindex');
+    canvas.setAttribute('role', 'img');
+    canvas.setAttribute('aria-label', 'The Tomeow island around the notch, with a pixel cat saying "Short break time!"');
+    document.querySelector('.hint').style.visibility = 'hidden';
+    return;
+  }
+
+  canvas.addEventListener('click', (ev) => { if (onIsland(toLocal(ev))) userAction(); });
+  canvas.addEventListener('mousemove', (ev) => { canvas.style.cursor = onIsland(toLocal(ev)) ? 'pointer' : ''; });
+  canvas.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); userAction(); }
+  });
+
+  after(0.4, appear);
+  let last = null;
+  const frame = (ts) => {
+    const dt = last == null ? 0 : Math.min(0.1, (ts - last) / 1000);
+    last = ts;
+    now += dt;
+    tick(dt);
+    runTasks();
+    autopilot();
+    draw(now);
+    placeGhost();
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
