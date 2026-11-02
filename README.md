@@ -1,6 +1,6 @@
 # Tomeow
 
-A tiny Pomodoro timer that lives in the MacBook notch. Click the island to start a focus round. When it ends, a pixel-art cat runs out of the notch to tell you to take a short break.
+A tiny Pomodoro timer that lives in the MacBook notch. Click the island to start a focus round. When it ends, a pixel-art cat runs out of the notch to tell you to take a short break, and after every fourth round, a long one.
 
 <p align="center">
   <img src="docs/island.png" width="560" alt="The Tomeow island around the notch: idle with a play button, counting down a focus round, and the cat announcing a break">
@@ -9,8 +9,8 @@ A tiny Pomodoro timer that lives in the MacBook notch. Click the island to start
 ## Features
 
 - Sits around the notch as a small black "island", with a tomato on one side and the countdown on the other. Screens without a notch get a small pill at the top centre instead.
-- When a focus round ends, the island opens and a ginger pixel cat drops out of the notch with a "Short break time!" bubble. When the break ends, the cat runs back in.
-- Round lengths are picked from presets: 25/5 (default), 50/10 or 15/3 minutes.
+- When a focus round ends, the island opens and a ginger pixel cat drops out of the notch with a "Short break time!" bubble, or "Long break time!" after every fourth round. When the break ends, the cat runs back in.
+- Round lengths are picked from presets of focus/break/long break: 25/5/15 (default), 50/10/30 or 15/3/10 minutes.
 - Optional auto-start of the next round after a break, a chime (on by default), and launch at login.
 - No Dock icon and no windows. Everything happens on the island.
 
@@ -20,7 +20,9 @@ A tiny Pomodoro timer that lives in the MacBook notch. Click the island to start
 | --- | --- |
 | Click the island | Start a round, or pause/resume the current one |
 | Click while the cat is out | Send the cat away, or start the next round when it asks "Ready? ▶" |
-| Right-click or Ctrl-click | Menu: start/pause/reset, skip break, durations, auto-start, sound, launch at login, quit |
+| Right-click or Ctrl-click | Menu: start/pause/reset, skip break, rounds done, durations, auto-start, sound, launch at login, quit |
+
+Reset during a focus round drops only that round. Rounds already finished still count toward the long break; choose "Reset rounds" afterwards to start the count over. Skipping a long break also starts it over.
 
 The countdown dims while paused. During a break the icon turns into a cat face and the countdown turns green.
 

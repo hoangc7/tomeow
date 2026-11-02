@@ -6,6 +6,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let timer = PomodoroTimer()
     private var panel: IslandPanel!
     private var island: IslandView!
+    /// Focus rounds finished since the last long break.
+    private var finishedRounds = 0
+    private var longBreakDue: Bool { finishedRounds >= Preset.roundsPerLongBreak }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard let geometry = NotchGeometry.current() else { return NSApp.terminate(nil) }
@@ -48,10 +51,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func finished(_ phase: PomodoroTimer.Phase) {
+        if phase == .rest && longBreakDue { finishedRounds = 0 }  // the cycle is complete
         if phase == .work {
             chime("Purr")
-            timer.start(.rest)
-            island.presentCat(.breakTime, text: "Short break time! 🐾")
+            finishedRounds += 1
+            timer.start(.rest, long: longBreakDue)
+            island.presentCat(.breakTime, text: longBreakDue ? "Long break time! 😺" : "Short break time! 🐾")
         } else if Settings.autoStart {
             chime("Glass")
             timer.start(.work)
@@ -89,7 +94,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         refresh()
     }
 
+    /// Mid-round, drops only the running round; pressed again while idle, also the finished ones.
+    /// Skipping a long break completes the cycle.
     @objc private func reset() {
+        if timer.phase == .idle || (timer.phase == .rest && longBreakDue) { finishedRounds = 0 }
         island.dismissCat()
         timer.reset()
         refresh()
@@ -106,13 +114,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if timer.phase != .idle {
             menu.addItem(item(timer.phase == .rest ? "Skip break" : "Reset", #selector(reset)))
+        } else if finishedRounds > 0 {
+            menu.addItem(item("Reset rounds", #selector(reset)))
+        }
+        if finishedRounds > 0 {
+            let rounds = menu.addItem(withTitle: "\(finishedRounds) of \(Preset.roundsPerLongBreak) rounds done",
+                                      action: nil, keyEquivalent: "")
+            rounds.isEnabled = false
         }
         menu.addItem(.separator())
 
         let durations = NSMenu()
         for (index, preset) in Preset.all.enumerated() {
-            let entry = item("\(preset.work) min focus · \(preset.rest) min break", #selector(pickPreset(_:)),
-                             on: preset == Settings.preset)
+            let title = "\(preset.work) min focus · \(preset.rest) min break · \(preset.longRest) min long break"
+            let entry = item(title, #selector(pickPreset(_:)), on: preset == Settings.preset)
             entry.tag = index
             durations.addItem(entry)
         }

@@ -3,8 +3,11 @@ import Foundation
 struct Preset: Equatable {
     let work: Int  // minutes
     let rest: Int
+    let longRest: Int  // every `roundsPerLongBreak`th break
 
-    static let all = [Preset(work: 25, rest: 5), Preset(work: 50, rest: 10), Preset(work: 15, rest: 3)]
+    static let all = [Preset(work: 25, rest: 5, longRest: 15), Preset(work: 50, rest: 10, longRest: 30),
+                      Preset(work: 15, rest: 3, longRest: 10)]
+    static let roundsPerLongBreak = 4
 }
 
 @MainActor
@@ -54,8 +57,9 @@ final class PomodoroTimer: NSObject {
     var seconds: Int { Int(remaining.rounded(.up)) }
     var progress: Double { phase == .idle ? 0 : 1 - remaining / duration }
 
-    func start(_ phase: Phase) {
-        let minutes = phase == .work ? Settings.preset.work : Settings.preset.rest
+    func start(_ phase: Phase, long: Bool = false) {
+        let preset = Settings.preset
+        let minutes = phase == .work ? preset.work : long ? preset.longRest : preset.rest
         self.phase = phase
         isPaused = false
         duration = TimeInterval(minutes) * Settings.secondsPerMinute
