@@ -126,7 +126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let durations = NSMenu()
         for (index, preset) in Preset.all.enumerated() {
-            let title = "\(preset.work) min focus · \(preset.rest) min break · \(preset.longRest) min long break"
+            let title = "Focus \(preset.work) · Break \(preset.rest)/\(preset.longRest)"
             let entry = item(title, #selector(pickPreset(_:)), on: preset == Settings.preset)
             entry.tag = index
             durations.addItem(entry)
