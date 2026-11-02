@@ -9,6 +9,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Focus rounds finished since the last long break.
     private var finishedRounds = 0
     private var longBreakDue: Bool { finishedRounds >= Preset.roundsPerLongBreak }
+    /// The progress bar of the menu that is open, kept filling by the timer's ticks.
+    private weak var roundsBar: RoundsBar?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard let geometry = NotchGeometry.current() else { return NSApp.terminate(nil) }
@@ -48,6 +50,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func refresh() {
         island.update(phase: timer.phase, seconds: timer.seconds, progress: timer.progress, paused: timer.isPaused)
+        roundsBar?.filled = roundsDone
+    }
+
+    /// Finished rounds plus how far the running focus round has got.
+    private var roundsDone: Double {
+        Double(finishedRounds) + (timer.phase == .work ? timer.progress : 0)
     }
 
     private func finished(_ phase: PomodoroTimer.Phase) {
@@ -107,6 +115,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
+        let bar = RoundsBar(steps: Preset.roundsPerLongBreak)
+        bar.filled = roundsDone
+        roundsBar = bar
+        let barItem = menu.addItem(withTitle: "", action: nil, keyEquivalent: "")
+        barItem.view = bar
+        barItem.isEnabled = false
+        menu.addItem(.separator())
+
         switch (timer.phase, timer.isPaused) {
         case (.idle, _): menu.addItem(item("Start focus", #selector(startWork)))
         case (_, false): menu.addItem(item("Pause", #selector(togglePause)))
@@ -116,11 +132,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(item(timer.phase == .rest ? "Skip break" : "Reset", #selector(reset)))
         } else if finishedRounds > 0 {
             menu.addItem(item("Reset rounds", #selector(reset)))
-        }
-        if finishedRounds > 0 {
-            let rounds = menu.addItem(withTitle: "\(finishedRounds) of \(Preset.roundsPerLongBreak) rounds done",
-                                      action: nil, keyEquivalent: "")
-            rounds.isEnabled = false
         }
         menu.addItem(.separator())
 

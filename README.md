@@ -20,7 +20,7 @@ A tiny Pomodoro timer that lives in the MacBook notch. Click the island to start
 | --- | --- |
 | Click the island | Start a round, or pause/resume the current one |
 | Click while the cat is out | Send the cat away, or start the next round when it asks "Ready? ▶" |
-| Right-click or Ctrl-click | Menu: start/pause/reset, skip break, rounds done, durations, auto-start, sound, launch at login, quit |
+| Right-click or Ctrl-click | Menu: a progress bar of the four rounds before the long break, start/pause/reset, skip break, durations, auto-start, sound, launch at login, quit |
 
 Reset during a focus round drops only that round. Rounds already finished still count toward the long break; choose "Reset rounds" afterwards to start the count over. Skipping a long break also starts it over.
 
